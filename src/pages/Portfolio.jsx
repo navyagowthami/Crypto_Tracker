@@ -59,7 +59,9 @@ const Portfolio = () => {
   const fetchCryptoList = async () => {
     try {
       const data = await cryptoAPI.getMarketData(1, 100);
-      setCryptoList(data);
+      // Sort alphabetically by name
+      const sortedData = [...data].sort((a, b) => a.name.localeCompare(b.name));
+      setCryptoList(sortedData);
     } catch (error) {
       console.error('Failed to fetch crypto list');
     }
@@ -399,8 +401,8 @@ const Portfolio = () => {
 
         {/* Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="fixed inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto py-8">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl my-auto">
               <h2 className="text-2xl font-bold mb-4">
                 {editingItem ? 'Edit Portfolio Item' : 'Add Portfolio Item'}
               </h2>
@@ -413,7 +415,8 @@ const Portfolio = () => {
                     value={formData.coinId}
                     onChange={(e) => handleCryptoSelect(e.target.value)}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                    style={{ maxHeight: '200px' }}
                   >
                     <option value="">Select a cryptocurrency</option>
                     {cryptoList.map((crypto) => (

@@ -8,6 +8,7 @@ const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || DEFAULT_API_BASE_URL
 const LOCAL_STORAGE_KEYS = {
   portfolio: 'cryptoTracker_portfolio',
   alerts: 'cryptoTracker_alerts',
+  users: 'cryptoTracker_users',
 };
 
 // Deterministic mock data so the app still works when external APIs are blocked (offline / rate limits).
@@ -185,13 +186,53 @@ const withFallback = async (resource, action, requestFn, fallbackFn) => {
   return { data: fallbackResult };
 };
 
-const createLocalResourceAPI = (resource) => ({
+// Helper to get current user ID from localStorage
+const getCurrentUserId = () => {
+  if (!hasBrowserStorage) return null;
+  try {
+    const userStr = localStorage.getItem('cryptoTracker_user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return user?.id || null;
+    }
+  } catch (error) {
+    console.warn('Error getting current user:', error);
+  }
+  return null;
+};
+
+const createLocalResourceAPI = (resource, filterByUserId = false) => ({
   getAll: () =>
     withFallback(
       resource,
       'getAll',
-      () => api.get(`/${resource}`),
-      () => readLocalData(resource)
+      async () => {
+        const response = await api.get(`/${resource}`);
+        let data = response.data;
+        // Filter by userId if needed
+        if (filterByUserId) {
+          const userId = getCurrentUserId();
+          if (userId) {
+            data = data.filter((item) => item.userId === userId);
+          } else {
+            data = [];
+          }
+        }
+        return { data };
+      },
+      () => {
+        let data = readLocalData(resource);
+        // Filter by userId if needed
+        if (filterByUserId) {
+          const userId = getCurrentUserId();
+          if (userId) {
+            data = data.filter((item) => item.userId === userId);
+          } else {
+            data = [];
+          }
+        }
+        return data;
+      }
     ),
   getById: (id) =>
     withFallback(
@@ -200,17 +241,45 @@ const createLocalResourceAPI = (resource) => ({
       () => api.get(`/${resource}/${id}`),
       () => {
         const data = readLocalData(resource);
-        return data.find((item) => `${item.id}` === `${id}`) || null;
+        const item = data.find((item) => `${item.id}` === `${id}`) || null;
+        // Check userId if filtering is enabled
+        if (filterByUserId && item) {
+          const userId = getCurrentUserId();
+          if (userId && item.userId !== userId) {
+            return null;
+          }
+        }
+        return item;
       }
     ),
   create: (payload) =>
     withFallback(
       resource,
       'create',
-      () => api.post(`/${resource}`, payload),
+      async () => {
+        let finalPayload = { ...payload };
+        // Add userId if filtering is enabled
+        if (filterByUserId) {
+          const userId = getCurrentUserId();
+          if (!userId) {
+            throw new Error('User not authenticated');
+          }
+          finalPayload = { ...finalPayload, userId };
+        }
+        return await api.post(`/${resource}`, finalPayload);
+      },
       () => {
         const data = readLocalData(resource);
-        const newItem = { ...payload, id: payload?.id ?? generateLocalId() };
+        let finalPayload = { ...payload };
+        // Add userId if filtering is enabled
+        if (filterByUserId) {
+          const userId = getCurrentUserId();
+          if (!userId) {
+            throw new Error('User not authenticated');
+          }
+          finalPayload = { ...finalPayload, userId };
+        }
+        const newItem = { ...finalPayload, id: finalPayload?.id ?? generateLocalId() };
         writeLocalData(resource, [...data, newItem]);
         return newItem;
       }
@@ -219,11 +288,41 @@ const createLocalResourceAPI = (resource) => ({
     withFallback(
       resource,
       'update',
-      () => api.put(`/${resource}/${id}`, payload),
+      async () => {
+        let finalPayload = { ...payload };
+        // Ensure userId is preserved if filtering is enabled
+        if (filterByUserId) {
+          const userId = getCurrentUserId();
+          if (!userId) {
+            throw new Error('User not authenticated');
+          }
+          // Don't override userId if it's already set
+          if (!finalPayload.userId) {
+            finalPayload = { ...finalPayload, userId };
+          }
+        }
+        return await api.put(`/${resource}/${id}`, finalPayload);
+      },
       () => {
         const data = readLocalData(resource);
+        const item = data.find((item) => `${item.id}` === `${id}`);
+        if (!item) return null;
+        
+        let finalPayload = { ...payload };
+        // Check userId if filtering is enabled
+        if (filterByUserId) {
+          const userId = getCurrentUserId();
+          if (!userId || item.userId !== userId) {
+            throw new Error('Unauthorized');
+          }
+          // Preserve userId
+          if (!finalPayload.userId) {
+            finalPayload = { ...finalPayload, userId };
+          }
+        }
+        
         const updatedData = data.map((item) =>
-          `${item.id}` === `${id}` ? { ...item, ...payload, id: item.id } : item
+          `${item.id}` === `${id}` ? { ...item, ...finalPayload, id: item.id } : item
         );
         writeLocalData(resource, updatedData);
         return updatedData.find((item) => `${item.id}` === `${id}`) || null;
@@ -236,6 +335,16 @@ const createLocalResourceAPI = (resource) => ({
       () => api.delete(`/${resource}/${id}`),
       () => {
         const data = readLocalData(resource);
+        const item = data.find((item) => `${item.id}` === `${id}`);
+        
+        // Check userId if filtering is enabled
+        if (filterByUserId && item) {
+          const userId = getCurrentUserId();
+          if (!userId || item.userId !== userId) {
+            throw new Error('Unauthorized');
+          }
+        }
+        
         const filtered = data.filter((item) => `${item.id}` !== `${id}`);
         writeLocalData(resource, filtered);
         return true;
@@ -243,11 +352,104 @@ const createLocalResourceAPI = (resource) => ({
     ),
 });
 
-// Portfolio API
-export const portfolioAPI = createLocalResourceAPI('portfolio');
+// Portfolio API (user-specific)
+export const portfolioAPI = createLocalResourceAPI('portfolio', true);
 
-// Alerts API
-export const alertsAPI = createLocalResourceAPI('alerts');
+// Alerts API (user-specific)
+export const alertsAPI = createLocalResourceAPI('alerts', true);
+
+// Auth API
+export const authAPI = {
+  login: async (email, password) => {
+    try {
+      const response = await api.get('/users');
+      const users = response.data;
+      const user = users.find(
+        (u) => u.email === email && u.password === password
+      );
+      
+      if (user) {
+        // Don't return password
+        const { password: _, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      }
+      
+      // Fallback to localStorage
+      const localUsers = readLocalData('users');
+      const localUser = localUsers.find(
+        (u) => u.email === email && u.password === password
+      );
+      
+      if (localUser) {
+        const { password: _, ...userWithoutPassword } = localUser;
+        return userWithoutPassword;
+      }
+      
+      return null;
+    } catch (error) {
+      if (isNetworkError(error)) {
+        // Fallback to localStorage
+        const localUsers = readLocalData('users');
+        const localUser = localUsers.find(
+          (u) => u.email === email && u.password === password
+        );
+        
+        if (localUser) {
+          const { password: _, ...userWithoutPassword } = localUser;
+          return userWithoutPassword;
+        }
+      }
+      throw error;
+    }
+  },
+  
+  signup: async (name, email, password) => {
+    try {
+      // Check if user exists
+      const response = await api.get('/users');
+      const users = response.data;
+      const existingUser = users.find((u) => u.email === email);
+      
+      if (existingUser) {
+        throw new Error('User with this email already exists');
+      }
+      
+      // Create new user
+      const newUser = {
+        name,
+        email,
+        password, // In production, this should be hashed
+        id: Date.now() + Math.floor(Math.random() * 1_000),
+      };
+      
+      await api.post('/users', newUser);
+      const { password: _, ...userWithoutPassword } = newUser;
+      return userWithoutPassword;
+    } catch (error) {
+      if (isNetworkError(error)) {
+        // Fallback to localStorage
+        const localUsers = readLocalData('users');
+        const existingUser = localUsers.find((u) => u.email === email);
+        
+        if (existingUser) {
+          throw new Error('User with this email already exists');
+        }
+        
+        const newUser = {
+          name,
+          email,
+          password, // In production, this should be hashed
+          id: Date.now() + Math.floor(Math.random() * 1_000),
+        };
+        
+        writeLocalData('users', [...localUsers, newUser]);
+        const { password: _, ...userWithoutPassword } = newUser;
+        return userWithoutPassword;
+      }
+      throw error;
+    }
+  },
+};
 
 // Crypto Market Data API (using CoinGecko free API)
 let useMockMarketData = false;

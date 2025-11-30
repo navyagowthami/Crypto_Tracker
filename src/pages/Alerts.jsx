@@ -47,7 +47,9 @@ const Alerts = () => {
   const fetchCryptoList = async () => {
     try {
       const data = await cryptoAPI.getMarketData(1, 100);
-      setCryptoList(data);
+      // Sort alphabetically by name
+      const sortedData = [...data].sort((a, b) => a.name.localeCompare(b.name));
+      setCryptoList(sortedData);
     } catch (error) {
       console.error('Failed to fetch crypto list');
     }
@@ -289,7 +291,7 @@ const Alerts = () => {
         {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
               <h2 className="text-2xl font-bold mb-4">
                 {editingAlert ? 'Edit Alert' : 'Create Alert'}
               </h2>
