@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
 import { alertsAPI, cryptoAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
 import { FaPlus, FaEdit, FaTrash, FaBell, FaSpinner } from 'react-icons/fa';
 
 const Alerts = () => {
+  const { user } = useAuth();
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingAlert, setEditingAlert] = useState(null);
   const [cryptoList, setCryptoList] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
   const [formData, setFormData] = useState({
     coinId: '',
     coinName: '',
@@ -19,17 +23,26 @@ const Alerts = () => {
   });
 
   useEffect(() => {
+    if (!user) return;
+    
     const loadData = async () => {
+      // Clear crypto list when user changes to force refetch
+      setCryptoList([]);
       await fetchAlerts();
       await fetchCryptoList();
       // Initial check after loading
       setTimeout(checkAlerts, 2000);
     };
+    
     loadData();
+    
     // Check alerts every 30 seconds
     const interval = setInterval(checkAlerts, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, [user]);
 
   const fetchAlerts = async () => {
     try {
@@ -46,12 +59,20 @@ const Alerts = () => {
 
   const fetchCryptoList = async () => {
     try {
-      const data = await cryptoAPI.getMarketData(1, 100);
-      // Sort alphabetically by name
-      const sortedData = [...data].sort((a, b) => a.name.localeCompare(b.name));
-      setCryptoList(sortedData);
+      // Use the shared cached cryptocurrency list (same for all users)
+      const allCryptos = await cryptoAPI.getAllCryptocurrencies();
+      
+      if (allCryptos && allCryptos.length > 0) {
+        // Already sorted alphabetically and deduplicated by the API function
+        setCryptoList(allCryptos);
+        console.log(`Loaded ${allCryptos.length} cryptocurrencies for dropdown`);
+      } else {
+        console.warn('No cryptocurrency data available');
+        setCryptoList([]);
+      }
     } catch (error) {
-      console.error('Failed to fetch crypto list');
+      console.error('Failed to fetch crypto list', error);
+      setCryptoList([]);
     }
   };
 
@@ -323,15 +344,18 @@ const Alerts = () => {
                     value={formData.coinId}
                     onChange={(e) => handleCryptoSelect(e.target.value)}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm"
                   >
-                    <option value="">Select a cryptocurrency</option>
+                    <option value="">Select a cryptocurrency ({cryptoList.length} available)</option>
                     {cryptoList.map((crypto) => (
                       <option key={crypto.id} value={crypto.id}>
                         {crypto.name} ({crypto.symbol.toUpperCase()})
                       </option>
                     ))}
                   </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    All cryptocurrencies are listed alphabetically. Use the dropdown scrollbar to navigate.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

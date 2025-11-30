@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { portfolioAPI, cryptoAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
 import { FaPlus, FaEdit, FaTrash, FaDownload, FaSpinner } from 'react-icons/fa';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const Portfolio = () => {
+  const { user } = useAuth();
   const [portfolio, setPortfolio] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -21,9 +23,13 @@ const Portfolio = () => {
   });
 
   useEffect(() => {
-    fetchPortfolio();
-    fetchCryptoList();
-  }, []);
+    if (user) {
+      // Clear crypto list when user changes to force refetch
+      setCryptoList([]);
+      fetchPortfolio();
+      fetchCryptoList();
+    }
+  }, [user]);
 
   const fetchPortfolio = async () => {
     try {
@@ -58,12 +64,20 @@ const Portfolio = () => {
 
   const fetchCryptoList = async () => {
     try {
-      const data = await cryptoAPI.getMarketData(1, 100);
-      // Sort alphabetically by name
-      const sortedData = [...data].sort((a, b) => a.name.localeCompare(b.name));
-      setCryptoList(sortedData);
+      // Use the shared cached cryptocurrency list (same for all users)
+      const allCryptos = await cryptoAPI.getAllCryptocurrencies();
+      
+      if (allCryptos && allCryptos.length > 0) {
+        // Already sorted alphabetically and deduplicated by the API function
+        setCryptoList(allCryptos);
+        console.log(`Loaded ${allCryptos.length} cryptocurrencies for dropdown`);
+      } else {
+        console.warn('No cryptocurrency data available');
+        setCryptoList([]);
+      }
     } catch (error) {
-      console.error('Failed to fetch crypto list');
+      console.error('Failed to fetch crypto list', error);
+      setCryptoList([]);
     }
   };
 
@@ -424,16 +438,18 @@ const Portfolio = () => {
                     value={formData.coinId}
                     onChange={(e) => handleCryptoSelect(e.target.value)}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                    style={{ maxHeight: '200px' }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm"
                   >
-                    <option value="">Select a cryptocurrency</option>
+                    <option value="">Select a cryptocurrency ({cryptoList.length} available)</option>
                     {cryptoList.map((crypto) => (
                       <option key={crypto.id} value={crypto.id}>
                         {crypto.name} ({crypto.symbol.toUpperCase()})
                       </option>
                     ))}
                   </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    All cryptocurrencies are listed alphabetically. Use the dropdown scrollbar to navigate.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

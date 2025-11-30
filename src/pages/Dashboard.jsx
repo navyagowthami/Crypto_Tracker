@@ -5,26 +5,53 @@ import { FaSearch, FaSpinner } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
 const Dashboard = () => {
+  const [allCryptos, setAllCryptos] = useState([]);
   const [cryptos, setCryptos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
+  const itemsPerPage = 50;
 
   useEffect(() => {
-    fetchCryptos();
+    fetchAllCryptos();
     // Refresh data every 30 seconds
-    const interval = setInterval(fetchCryptos, 30000);
+    const interval = setInterval(fetchAllCryptos, 30000);
     return () => clearInterval(interval);
-  }, [page]);
+  }, []);
 
-  const fetchCryptos = async () => {
+  useEffect(() => {
+    // Update displayed cryptos when page or allCryptos changes
+    if (allCryptos.length === 0) {
+      setCryptos([]);
+      return;
+    }
+
+    // Calculate pagination: show itemsPerPage items per page
+    // Each page shows a fresh set starting from (page - 1) * itemsPerPage
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageData = allCryptos.slice(startIndex, endIndex);
+    
+    setCryptos(pageData);
+  }, [page, allCryptos, itemsPerPage]);
+
+  const fetchAllCryptos = async () => {
     try {
       setLoading(true);
-      const data = await cryptoAPI.getMarketData(page, 50);
-      setCryptos(data);
+      // Use the cached full cryptocurrency list (same as Portfolio/Alerts)
+      const allData = await cryptoAPI.getAllCryptocurrencies();
+      
+      if (allData && allData.length > 0) {
+        setAllCryptos(allData);
+        console.log(`Loaded ${allData.length} cryptocurrencies for dashboard`);
+      } else {
+        toast.error('Failed to load cryptocurrency data.');
+        setAllCryptos([]);
+      }
     } catch (error) {
       toast.error('Failed to fetch crypto data. Please try again later.');
       console.error(error);
+      setAllCryptos([]);
     } finally {
       setLoading(false);
     }
@@ -35,6 +62,8 @@ const Dashboard = () => {
       crypto.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       crypto.symbol.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const totalPages = Math.ceil(allCryptos.length / itemsPerPage);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -85,22 +114,39 @@ const Dashboard = () => {
             )}
 
             {/* Pagination */}
-            <div className="mt-8 flex justify-center space-x-4">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
-              >
-                Previous
-              </button>
-              <span className="px-4 py-2 text-gray-700">Page {page}</span>
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Next
-              </button>
-            </div>
+            {!searchTerm && allCryptos.length > itemsPerPage && (
+              <div className="mt-8 flex justify-center items-center space-x-4">
+                <button
+                  onClick={() => {
+                    setPage((p) => Math.max(1, p - 1));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  disabled={page === 1}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="px-4 py-2 text-gray-700">
+                  Page {page} of {totalPages} ({allCryptos.length} total)
+                </span>
+                <button
+                  onClick={() => {
+                    setPage((p) => Math.min(totalPages, p + 1));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  disabled={page >= totalPages}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+            
+            {searchTerm && (
+              <div className="mt-8 text-center text-gray-600">
+                Showing {filteredCryptos.length} of {allCryptos.length} cryptocurrencies
+              </div>
+            )}
           </>
         )}
       </div>

@@ -9,6 +9,8 @@ const LOCAL_STORAGE_KEYS = {
   portfolio: 'cryptoTracker_portfolio',
   alerts: 'cryptoTracker_alerts',
   users: 'cryptoTracker_users',
+  cryptoList: 'cryptoTracker_cryptoList',
+  cryptoListTimestamp: 'cryptoTracker_cryptoListTimestamp',
 };
 
 // Deterministic mock data so the app still works when external APIs are blocked (offline / rate limits).
@@ -361,6 +363,18 @@ export const alertsAPI = createLocalResourceAPI('alerts', true);
 // Auth API
 export const authAPI = {
   login: async (email, password) => {
+    // Always check localStorage first (primary storage)
+    const localUsers = readLocalData('users');
+    const localUser = localUsers.find(
+      (u) => u.email === email && u.password === password
+    );
+    
+    if (localUser) {
+      const { password: _, ...userWithoutPassword } = localUser;
+      return userWithoutPassword;
+    }
+    
+    // Optionally check API if available (for sync purposes)
     try {
       const response = await api.get('/users');
       const users = response.data;
@@ -369,85 +383,56 @@ export const authAPI = {
       );
       
       if (user) {
-        // Don't return password
+        // Sync to localStorage
+        const existingIndex = localUsers.findIndex((u) => u.id === user.id);
+        if (existingIndex >= 0) {
+          localUsers[existingIndex] = user;
+        } else {
+          localUsers.push(user);
+        }
+        writeLocalData('users', localUsers);
+        
         const { password: _, ...userWithoutPassword } = user;
         return userWithoutPassword;
       }
-      
-      // Fallback to localStorage
-      const localUsers = readLocalData('users');
-      const localUser = localUsers.find(
-        (u) => u.email === email && u.password === password
-      );
-      
-      if (localUser) {
-        const { password: _, ...userWithoutPassword } = localUser;
-        return userWithoutPassword;
-      }
-      
-      return null;
     } catch (error) {
-      if (isNetworkError(error)) {
-        // Fallback to localStorage
-        const localUsers = readLocalData('users');
-        const localUser = localUsers.find(
-          (u) => u.email === email && u.password === password
-        );
-        
-        if (localUser) {
-          const { password: _, ...userWithoutPassword } = localUser;
-          return userWithoutPassword;
-        }
-      }
-      throw error;
+      // API not available, that's fine - we already checked localStorage
+      console.warn('API not available, using localStorage only:', error);
     }
+    
+    return null;
   },
   
   signup: async (name, email, password) => {
-    try {
-      // Check if user exists
-      const response = await api.get('/users');
-      const users = response.data;
-      const existingUser = users.find((u) => u.email === email);
-      
-      if (existingUser) {
-        throw new Error('User with this email already exists');
-      }
-      
-      // Create new user
-      const newUser = {
-        name,
-        email,
-        password, // In production, this should be hashed
-        id: Date.now() + Math.floor(Math.random() * 1_000),
-      };
-      
-      await api.post('/users', newUser);
-      const { password: _, ...userWithoutPassword } = newUser;
-      return userWithoutPassword;
-    } catch (error) {
-      if (isNetworkError(error)) {
-        // Fallback to localStorage
-        const localUsers = readLocalData('users');
-        const existingUser = localUsers.find((u) => u.email === email);
-        
-        if (existingUser) {
-          throw new Error('User with this email already exists');
-        }
-        
-        const newUser = {
-          name,
-          email,
-          password, // In production, this should be hashed
-          id: Date.now() + Math.floor(Math.random() * 1_000),
-        };
-        
-        writeLocalData('users', [...localUsers, newUser]);
-        const { password: _, ...userWithoutPassword } = newUser;
-        return userWithoutPassword;
-      }
-      throw error;
+    // Always check localStorage first (primary storage)
+    const localUsers = readLocalData('users');
+    const existingUser = localUsers.find((u) => u.email === email);
+    
+    if (existingUser) {
+      throw new Error('User with this email already exists');
     }
+    
+    // Create new user
+    const newUser = {
+      name,
+      email,
+      password, // In production, this should be hashed
+      id: Date.now() + Math.floor(Math.random() * 1_000),
+    };
+    
+    // Always save to localStorage first (primary storage)
+    writeLocalData('users', [...localUsers, newUser]);
+    
+    // Optionally sync to API if available
+    try {
+      await api.post('/users', newUser);
+    } catch (error) {
+      // API not available, that's fine - we already saved to localStorage
+      console.warn('API not available, saved to localStorage only:', error);
+    }
+    
+    const { password: _, ...userWithoutPassword } = newUser;
+    return userWithoutPassword;
   },
 };
 
@@ -457,11 +442,131 @@ let useMockCoinDetails = false;
 
 const paginateMockData = (page, perPage) => {
   const start = (page - 1) * perPage;
-  const slice = mockMarketData.slice(start, start + perPage);
-  return slice.length > 0 ? slice : mockMarketData;
+  const end = start + perPage;
+  const slice = mockMarketData.slice(start, end);
+  
+  // If we've reached the end of mock data, return what we have
+  // (Mock data only has 10 items, so pages beyond 1 will be empty)
+  if (slice.length === 0) {
+    // Return empty array - this indicates we've run out of mock data
+    return [];
+  }
+  
+  return slice;
+};
+
+// Cache for full cryptocurrency list (shared across all users)
+const CRYPTO_LIST_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+const getCachedCryptoList = () => {
+  if (!hasBrowserStorage) return null;
+  try {
+    const cached = localStorage.getItem(LOCAL_STORAGE_KEYS.cryptoList);
+    const timestamp = localStorage.getItem(LOCAL_STORAGE_KEYS.cryptoListTimestamp);
+    
+    if (cached && timestamp) {
+      const age = Date.now() - parseInt(timestamp, 10);
+      if (age < CRYPTO_LIST_CACHE_DURATION) {
+        return JSON.parse(cached);
+      }
+    }
+  } catch (error) {
+    console.warn('Error reading cached crypto list:', error);
+  }
+  return null;
+};
+
+const setCachedCryptoList = (list) => {
+  if (!hasBrowserStorage) return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.cryptoList, JSON.stringify(list));
+    localStorage.setItem(LOCAL_STORAGE_KEYS.cryptoListTimestamp, Date.now().toString());
+  } catch (error) {
+    console.warn('Error caching crypto list:', error);
+  }
+};
+
+// Fetch all available cryptocurrencies (up to 1000)
+const fetchAllCryptocurrencies = async () => {
+  const cached = getCachedCryptoList();
+  if (cached && cached.length > 0) {
+    console.log(`Using cached crypto list with ${cached.length} items`);
+    return cached;
+  }
+
+  console.log('Fetching fresh cryptocurrency list from API...');
+  const allCryptos = [];
+  let page = 1;
+  const perPage = 250; // Max allowed by CoinGecko
+  const maxPages = 4; // Fetch up to 1000 cryptocurrencies
+
+  try {
+    while (page <= maxPages) {
+      try {
+        const response = await axios.get(
+          `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${perPage}&page=${page}&sparkline=false`,
+          { timeout: 10000 } // 10 second timeout
+        );
+        
+        if (!response.data || response.data.length === 0) {
+          break; // No more data
+        }
+        
+        allCryptos.push(...response.data);
+        
+        // If we got less than perPage, we've reached the end
+        if (response.data.length < perPage) {
+          break;
+        }
+        
+        page++;
+        
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (error) {
+        console.warn(`Error fetching page ${page}:`, error.message);
+        // Continue to next page even if one fails
+        page++;
+        if (page > maxPages) break;
+      }
+    }
+
+    if (allCryptos.length > 0) {
+      // Remove duplicates and sort alphabetically
+      const uniqueCryptos = allCryptos.filter((crypto, index, self) =>
+        index === self.findIndex((c) => c.id === crypto.id)
+      );
+      
+      const sortedCryptos = uniqueCryptos.sort((a, b) => 
+        a.name.localeCompare(b.name)
+      );
+      
+      // Cache the result
+      setCachedCryptoList(sortedCryptos);
+      console.log(`Fetched and cached ${sortedCryptos.length} cryptocurrencies`);
+      return sortedCryptos;
+    }
+  } catch (error) {
+    console.error('Error fetching all cryptocurrencies:', error);
+  }
+
+  // Fallback to cached data even if expired
+  if (cached && cached.length > 0) {
+    console.log(`Using expired cache with ${cached.length} items`);
+    return cached;
+  }
+
+  // Last resort: return empty array
+  console.warn('No cryptocurrency data available');
+  return [];
 };
 
 export const cryptoAPI = {
+  // Get all cryptocurrencies (for dropdowns) - uses cache
+  getAllCryptocurrencies: async () => {
+    return await fetchAllCryptocurrencies();
+  },
+
   getMarketData: async (page = 1, perPage = 50) => {
     if (useMockMarketData) {
       return paginateMockData(page, perPage);
