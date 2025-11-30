@@ -402,8 +402,17 @@ const Portfolio = () => {
         {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto py-8">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl my-auto">
-              <h2 className="text-2xl font-bold mb-4">
+            <div className="relative rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl my-auto overflow-hidden" style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)'
+            }}>
+              {/* Pattern Overlay */}
+              <div className="absolute inset-0 opacity-10" style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='30' y='30' font-size='30' fill='white' text-anchor='middle'%3E₿%3C/text%3E%3C/svg%3E")`,
+                backgroundSize: '80px 80px'
+              }}></div>
+              
+              <div className="relative z-10 bg-white/95 backdrop-blur-sm rounded-lg p-6 -m-6">
+              <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 {editingItem ? 'Edit Portfolio Item' : 'Add Portfolio Item'}
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -489,6 +498,7 @@ const Portfolio = () => {
                   </button>
                 </div>
               </form>
+              </div>
             </div>
           </div>
         )}

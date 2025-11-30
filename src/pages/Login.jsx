@@ -78,9 +78,38 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden" style={{
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%)',
+      backgroundSize: '400% 400%',
+      animation: 'gradientShift 15s ease infinite'
+    }}>
+      {/* Crypto Pattern Overlay */}
+      <div className="absolute inset-0 opacity-20" style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='10' y='50' font-size='40' fill='white' opacity='0.3'%3E₿%3C/text%3E%3Ctext x='60' y='50' font-size='30' fill='white' opacity='0.2'%3EΞ%3C/text%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg width='80' height='80' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='40' y='40' font-size='25' fill='white' opacity='0.25'%3E●%3C/text%3E%3C/svg%3E")`,
+        backgroundSize: '200px 200px, 150px 150px',
+        backgroundPosition: '0 0, 100px 100px'
+      }}></div>
+      
+      {/* Animated Crypto Icons */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 text-6xl opacity-20 animate-bounce" style={{ animationDuration: '3s' }}>₿</div>
+        <div className="absolute top-40 right-20 text-5xl opacity-20 animate-pulse" style={{ animationDuration: '2s' }}>Ξ</div>
+        <div className="absolute bottom-32 left-20 text-4xl opacity-20 animate-bounce" style={{ animationDuration: '4s', animationDelay: '1s' }}>●</div>
+        <div className="absolute bottom-20 right-32 text-5xl opacity-20 animate-pulse" style={{ animationDuration: '2.5s', animationDelay: '0.5s' }}>₿</div>
+        <div className="absolute top-1/2 left-1/4 text-4xl opacity-20 animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1.5s' }}>Ξ</div>
+        <div className="absolute top-1/3 right-1/3 text-3xl opacity-20 animate-pulse" style={{ animationDuration: '2.2s' }}>●</div>
+      </div>
+      
+      <style>{`
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
+      
+      <div className="max-w-md w-full relative z-10">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-2">
               ₿ Crypto Tracker

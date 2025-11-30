@@ -182,6 +182,13 @@ const Alerts = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <style>{`
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8 flex justify-between items-center">
           <div>
@@ -290,9 +297,21 @@ const Alerts = () => {
 
         {/* Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-              <h2 className="text-2xl font-bold mb-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="relative rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl overflow-hidden" style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%)',
+              backgroundSize: '400% 400%',
+              animation: 'gradientShift 12s ease infinite'
+            }}>
+              {/* Animated Pattern Overlay */}
+              <div className="absolute inset-0 opacity-15" style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='40' y='40' font-size='35' fill='white' text-anchor='middle'%3E🔔%3C/text%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='30' y='30' font-size='25' fill='white' text-anchor='middle' opacity='0.6'%3E₿%3C/text%3E%3C/svg%3E")`,
+                backgroundSize: '120px 120px, 100px 100px',
+                backgroundPosition: '0 0, 60px 60px'
+              }}></div>
+              
+              <div className="relative z-10 bg-white/95 backdrop-blur-sm rounded-lg p-6 -m-6">
+              <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 {editingAlert ? 'Edit Alert' : 'Create Alert'}
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -377,6 +396,7 @@ const Alerts = () => {
                   </button>
                 </div>
               </form>
+              </div>
             </div>
           </div>
         )}
