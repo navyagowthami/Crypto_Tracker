@@ -22,7 +22,6 @@ const Login = () => {
 
     try {
       if (isLogin) {
-        // Login
         if (!formData.email || !formData.password) {
           toast.error('Please fill in all fields');
           setLoading(false);
@@ -36,7 +35,6 @@ const Login = () => {
           toast.error(result.error || 'Login failed');
         }
       } else {
-        // Signup
         if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
           toast.error('Please fill in all fields');
           setLoading(false);

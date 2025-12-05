@@ -18,7 +18,7 @@ const Alerts = () => {
     coinName: '',
     symbol: '',
     targetPrice: '',
-    condition: 'above', // 'above' or 'below'
+    condition: 'above', 
     isActive: true,
   });
 

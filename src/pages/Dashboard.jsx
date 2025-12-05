@@ -14,31 +14,31 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchAllCryptos();
-    // Refresh data every 30 seconds
     const interval = setInterval(fetchAllCryptos, 30000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    // Update displayed cryptos when page or allCryptos changes
     if (allCryptos.length === 0) {
       setCryptos([]);
       return;
     }
 
-    // Calculate pagination: show itemsPerPage items per page
-    // Each page shows a fresh set starting from (page - 1) * itemsPerPage
+    // If there's a search term, don't paginate - show filtered results
+    if (searchTerm.trim()) {
+      return;
+    }
+
     const startIndex = (page - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const pageData = allCryptos.slice(startIndex, endIndex);
     
     setCryptos(pageData);
-  }, [page, allCryptos, itemsPerPage]);
+  }, [page, allCryptos, itemsPerPage, searchTerm]);
 
   const fetchAllCryptos = async () => {
     try {
       setLoading(true);
-      // Use the cached full cryptocurrency list (same as Portfolio/Alerts)
       const allData = await cryptoAPI.getAllCryptocurrencies();
       
       if (allData && allData.length > 0) {
@@ -57,11 +57,14 @@ const Dashboard = () => {
     }
   };
 
-  const filteredCryptos = cryptos.filter(
-    (crypto) =>
-      crypto.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      crypto.symbol.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter through all cryptocurrencies when searching, otherwise use paginated cryptos
+  const filteredCryptos = searchTerm.trim()
+    ? allCryptos.filter(
+        (crypto) =>
+          crypto.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          crypto.symbol.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : cryptos;
 
   const totalPages = Math.ceil(allCryptos.length / itemsPerPage);
 
@@ -85,7 +88,13 @@ const Dashboard = () => {
               type="text"
               placeholder="Search cryptocurrencies..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                // Reset to page 1 when search is cleared
+                if (!e.target.value.trim() && page !== 1) {
+                  setPage(1);
+                }
+              }}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>

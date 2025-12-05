@@ -13,7 +13,6 @@ const LOCAL_STORAGE_KEYS = {
   cryptoListTimestamp: 'cryptoTracker_cryptoListTimestamp',
 };
 
-// Deterministic mock data so the app still works when external APIs are blocked (offline / rate limits).
 const mockMarketData = [
   {
     id: 'bitcoin',
@@ -124,12 +123,10 @@ const mockCoinDetails = mockMarketData.reduce((acc, coin) => {
   return acc;
 }, {});
 
-// Track whether we should bypass HTTP calls altogether (e.g. server not running or deployed build)
 let useLocalFallback = false;
 const hasBrowserStorage =
   typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
-// Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -188,7 +185,6 @@ const withFallback = async (resource, action, requestFn, fallbackFn) => {
   return { data: fallbackResult };
 };
 
-// Helper to get current user ID from localStorage
 const getCurrentUserId = () => {
   if (!hasBrowserStorage) return null;
   try {
@@ -211,7 +207,6 @@ const createLocalResourceAPI = (resource, filterByUserId = false) => ({
       async () => {
         const response = await api.get(`/${resource}`);
         let data = response.data;
-        // Filter by userId if needed
         if (filterByUserId) {
           const userId = getCurrentUserId();
           if (userId) {
@@ -244,7 +239,6 @@ const createLocalResourceAPI = (resource, filterByUserId = false) => ({
       () => {
         const data = readLocalData(resource);
         const item = data.find((item) => `${item.id}` === `${id}`) || null;
-        // Check userId if filtering is enabled
         if (filterByUserId && item) {
           const userId = getCurrentUserId();
           if (userId && item.userId !== userId) {
@@ -260,7 +254,6 @@ const createLocalResourceAPI = (resource, filterByUserId = false) => ({
       'create',
       async () => {
         let finalPayload = { ...payload };
-        // Add userId if filtering is enabled
         if (filterByUserId) {
           const userId = getCurrentUserId();
           if (!userId) {
@@ -273,7 +266,6 @@ const createLocalResourceAPI = (resource, filterByUserId = false) => ({
       () => {
         const data = readLocalData(resource);
         let finalPayload = { ...payload };
-        // Add userId if filtering is enabled
         if (filterByUserId) {
           const userId = getCurrentUserId();
           if (!userId) {
@@ -292,13 +284,11 @@ const createLocalResourceAPI = (resource, filterByUserId = false) => ({
       'update',
       async () => {
         let finalPayload = { ...payload };
-        // Ensure userId is preserved if filtering is enabled
         if (filterByUserId) {
           const userId = getCurrentUserId();
           if (!userId) {
             throw new Error('User not authenticated');
           }
-          // Don't override userId if it's already set
           if (!finalPayload.userId) {
             finalPayload = { ...finalPayload, userId };
           }
@@ -311,13 +301,11 @@ const createLocalResourceAPI = (resource, filterByUserId = false) => ({
         if (!item) return null;
         
         let finalPayload = { ...payload };
-        // Check userId if filtering is enabled
         if (filterByUserId) {
           const userId = getCurrentUserId();
           if (!userId || item.userId !== userId) {
             throw new Error('Unauthorized');
           }
-          // Preserve userId
           if (!finalPayload.userId) {
             finalPayload = { ...finalPayload, userId };
           }
@@ -396,7 +384,6 @@ export const authAPI = {
         return userWithoutPassword;
       }
     } catch (error) {
-      // API not available, that's fine - we already checked localStorage
       console.warn('API not available, using localStorage only:', error);
     }
     
