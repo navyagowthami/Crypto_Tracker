@@ -11,7 +11,6 @@ const News = () => {
 
   useEffect(() => {
     fetchNews();
-    // Refresh news every 5 minutes
     const interval = setInterval(fetchNews, 300000);
     return () => clearInterval(interval);
   }, []);

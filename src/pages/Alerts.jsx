@@ -26,17 +26,14 @@ const Alerts = () => {
     if (!user) return;
     
     const loadData = async () => {
-      // Clear crypto list when user changes to force refetch
       setCryptoList([]);
       await fetchAlerts();
       await fetchCryptoList();
-      // Initial check after loading
       setTimeout(checkAlerts, 2000);
     };
     
     loadData();
     
-    // Check alerts every 30 seconds
     const interval = setInterval(checkAlerts, 30000);
     
     return () => {
@@ -59,11 +56,9 @@ const Alerts = () => {
 
   const fetchCryptoList = async () => {
     try {
-      // Use the shared cached cryptocurrency list (same for all users)
       const allCryptos = await cryptoAPI.getAllCryptocurrencies();
       
       if (allCryptos && allCryptos.length > 0) {
-        // Already sorted alphabetically and deduplicated by the API function
         setCryptoList(allCryptos);
         console.log(`Loaded ${allCryptos.length} cryptocurrencies for dropdown`);
       } else {
@@ -78,7 +73,6 @@ const Alerts = () => {
 
   const checkAlerts = async () => {
     try {
-      // Fetch fresh alerts to avoid stale data
       const response = await alertsAPI.getAll();
       const currentAlerts = response.data;
       const activeAlerts = currentAlerts.filter((alert) => alert.isActive);
@@ -100,7 +94,6 @@ const Alerts = () => {
               `🚨 Alert: ${alert.coinName} (${alert.symbol}) is now $${currentPrice.toFixed(2)} (${alert.condition === 'above' ? 'above' : 'below'} $${alert.targetPrice})`,
               { autoClose: 10000 }
             );
-            // Deactivate alert after triggering
             await alertsAPI.update(alert.id, { ...alert, isActive: false });
             fetchAlerts();
           }

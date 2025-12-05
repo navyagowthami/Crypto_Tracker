@@ -342,16 +342,12 @@ const createLocalResourceAPI = (resource, filterByUserId = false) => ({
     ),
 });
 
-// Portfolio API (user-specific)
 export const portfolioAPI = createLocalResourceAPI('portfolio', true);
 
-// Alerts API (user-specific)
 export const alertsAPI = createLocalResourceAPI('alerts', true);
 
-// Auth API
 export const authAPI = {
   login: async (email, password) => {
-    // Always check localStorage first (primary storage)
     const localUsers = readLocalData('users');
     const localUser = localUsers.find(
       (u) => u.email === email && u.password === password
@@ -362,7 +358,6 @@ export const authAPI = {
       return userWithoutPassword;
     }
     
-    // Optionally check API if available (for sync purposes)
     try {
       const response = await api.get('/users');
       const users = response.data;
@@ -371,7 +366,6 @@ export const authAPI = {
       );
       
       if (user) {
-        // Sync to localStorage
         const existingIndex = localUsers.findIndex((u) => u.id === user.id);
         if (existingIndex >= 0) {
           localUsers[existingIndex] = user;
@@ -391,7 +385,6 @@ export const authAPI = {
   },
   
   signup: async (name, email, password) => {
-    // Always check localStorage first (primary storage)
     const localUsers = readLocalData('users');
     const existingUser = localUsers.find((u) => u.email === email);
     
@@ -399,22 +392,18 @@ export const authAPI = {
       throw new Error('User with this email already exists');
     }
     
-    // Create new user
     const newUser = {
       name,
       email,
-      password, // In production, this should be hashed
+      password, 
       id: Date.now() + Math.floor(Math.random() * 1_000),
     };
     
-    // Always save to localStorage first (primary storage)
     writeLocalData('users', [...localUsers, newUser]);
     
-    // Optionally sync to API if available
     try {
       await api.post('/users', newUser);
     } catch (error) {
-      // API not available, that's fine - we already saved to localStorage
       console.warn('API not available, saved to localStorage only:', error);
     }
     
@@ -423,7 +412,6 @@ export const authAPI = {
   },
 };
 
-// Crypto Market Data API (using CoinGecko free API)
 let useMockMarketData = false;
 let useMockCoinDetails = false;
 
@@ -432,17 +420,13 @@ const paginateMockData = (page, perPage) => {
   const end = start + perPage;
   const slice = mockMarketData.slice(start, end);
   
-  // If we've reached the end of mock data, return what we have
-  // (Mock data only has 10 items, so pages beyond 1 will be empty)
   if (slice.length === 0) {
-    // Return empty array - this indicates we've run out of mock data
     return [];
   }
   
   return slice;
 };
 
-// Cache for full cryptocurrency list (shared across all users)
 const CRYPTO_LIST_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 const getCachedCryptoList = () => {
@@ -473,7 +457,6 @@ const setCachedCryptoList = (list) => {
   }
 };
 
-// Fetch all available cryptocurrencies (up to 1000)
 const fetchAllCryptocurrencies = async () => {
   const cached = getCachedCryptoList();
   if (cached && cached.length > 0) {
@@ -484,42 +467,37 @@ const fetchAllCryptocurrencies = async () => {
   console.log('Fetching fresh cryptocurrency list from API...');
   const allCryptos = [];
   let page = 1;
-  const perPage = 250; // Max allowed by CoinGecko
-  const maxPages = 4; // Fetch up to 1000 cryptocurrencies
-
+  const perPage = 250; 
+  const maxPages = 4; 
   try {
     while (page <= maxPages) {
       try {
         const response = await axios.get(
           `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${perPage}&page=${page}&sparkline=false`,
-          { timeout: 10000 } // 10 second timeout
+          { timeout: 10000 } 
         );
         
         if (!response.data || response.data.length === 0) {
-          break; // No more data
+          break; 
         }
         
         allCryptos.push(...response.data);
         
-        // If we got less than perPage, we've reached the end
         if (response.data.length < perPage) {
           break;
         }
         
         page++;
         
-        // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 200));
       } catch (error) {
         console.warn(`Error fetching page ${page}:`, error.message);
-        // Continue to next page even if one fails
         page++;
         if (page > maxPages) break;
       }
     }
 
     if (allCryptos.length > 0) {
-      // Remove duplicates and sort alphabetically
       const uniqueCryptos = allCryptos.filter((crypto, index, self) =>
         index === self.findIndex((c) => c.id === crypto.id)
       );
@@ -528,7 +506,6 @@ const fetchAllCryptocurrencies = async () => {
         a.name.localeCompare(b.name)
       );
       
-      // Cache the result
       setCachedCryptoList(sortedCryptos);
       console.log(`Fetched and cached ${sortedCryptos.length} cryptocurrencies`);
       return sortedCryptos;
@@ -537,19 +514,16 @@ const fetchAllCryptocurrencies = async () => {
     console.error('Error fetching all cryptocurrencies:', error);
   }
 
-  // Fallback to cached data even if expired
   if (cached && cached.length > 0) {
     console.log(`Using expired cache with ${cached.length} items`);
     return cached;
   }
 
-  // Last resort: return empty array
   console.warn('No cryptocurrency data available');
   return [];
 };
 
 export const cryptoAPI = {
-  // Get all cryptocurrencies (for dropdowns) - uses cache
   getAllCryptocurrencies: async () => {
     return await fetchAllCryptocurrencies();
   },
@@ -586,18 +560,15 @@ export const cryptoAPI = {
   },
   getNews: async () => {
     try {
-      // Using CryptoCompare API for news (free tier)
       const response = await axios.get(
         'https://min-api.cryptocompare.com/data/v2/news/?lang=EN'
       );
       return response.data.Data || [];
     } catch (error) {
       console.error('Error fetching news:', error);
-      // Fallback to mock data if API fails
       return [];
     }
   },
 };
 
 export default api;
-

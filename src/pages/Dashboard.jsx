@@ -24,7 +24,6 @@ const Dashboard = () => {
       return;
     }
 
-    // If there's a search term, don't paginate - show filtered results
     if (searchTerm.trim()) {
       return;
     }
@@ -57,7 +56,6 @@ const Dashboard = () => {
     }
   };
 
-  // Filter through all cryptocurrencies when searching, otherwise use paginated cryptos
   const filteredCryptos = searchTerm.trim()
     ? allCryptos.filter(
         (crypto) =>

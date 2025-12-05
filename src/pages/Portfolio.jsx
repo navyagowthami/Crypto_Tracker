@@ -24,7 +24,6 @@ const Portfolio = () => {
 
   useEffect(() => {
     if (user) {
-      // Clear crypto list when user changes to force refetch
       setCryptoList([]);
       fetchPortfolio();
       fetchCryptoList();
@@ -37,7 +36,6 @@ const Portfolio = () => {
       const response = await portfolioAPI.getAll();
       const portfolioData = response.data;
       
-      // Fetch current prices for portfolio items
       const updatedPortfolio = await Promise.all(
         portfolioData.map(async (item) => {
           try {
@@ -64,11 +62,9 @@ const Portfolio = () => {
 
   const fetchCryptoList = async () => {
     try {
-      // Use the shared cached cryptocurrency list (same for all users)
       const allCryptos = await cryptoAPI.getAllCryptocurrencies();
       
       if (allCryptos && allCryptos.length > 0) {
-        // Already sorted alphabetically and deduplicated by the API function
         setCryptoList(allCryptos);
         console.log(`Loaded ${allCryptos.length} cryptocurrencies for dropdown`);
       } else {
