@@ -36,7 +36,6 @@ const News = () => {
       setFilteredNews(data);
     } catch (error) {
       toast.error('Failed to fetch news. Using fallback data.');
-      // Fallback mock data
       setNews([
         {
           id: 1,

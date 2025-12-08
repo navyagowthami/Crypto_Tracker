@@ -88,7 +88,6 @@ const Dashboard = () => {
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
-                // Reset to page 1 when search is cleared
                 if (!e.target.value.trim() && page !== 1) {
                   setPage(1);
                 }
